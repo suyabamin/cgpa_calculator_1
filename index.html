@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>7 College CGPA Calculator</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+:root{
+  --bg: linear-gradient(135deg,#ff3cac,#ff5e7e,#ff87c3);
+  --card: rgba(255,255,255,.3);
+  --text:#111;
+  --input: rgba(255,255,255,.9);
+}
+.dark{
+  --bg: linear-gradient(135deg,#2b0030,#5e0035);
+  --card: rgba(0,0,0,.55);
+  --text:#fff;
+  --input: rgba(255,255,255,.12);
+}
+*{box-sizing:border-box}
+body{margin:0; font-family:Segoe UI,sans-serif; min-height:100vh; background:var(--bg); display:flex; justify-content:center; padding:10px; color:var(--text);}
+.app{width:100%; max-width:1000px; background:var(--card); backdrop-filter:blur(18px); border-radius:22px; padding:20px; box-shadow:0 30px 60px rgba(0,0,0,.35);}
+.header{display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:10px;}
+h1{color:#e91e63;font-weight:800;margin:0;}
+button{border:none;padding:8px 16px;border-radius:20px;font-weight:bold;color:white;cursor:pointer;background:linear-gradient(135deg,#ff3cac,#e91e63);}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:15px;}
+input,select{width:100%;padding:10px;border-radius:12px;border:none;background:var(--input);text-align:center;}
+table{width:100%;margin-top:15px;border-collapse:collapse;}
+th{background:#e91e63;color:white;padding:8px;}
+td{padding:6px;text-align:center;}
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:15px;}
+.result{margin-top:15px;padding:12px;background:linear-gradient(135deg,#ff3cac,#e91e63);color:white;border-radius:12px;text-align:center;word-wrap: break-word;}
+.dedication{margin-top:10px;font-size:.8rem;text-align:center;color:#ff3cac;font-style:italic;}
+.chart-container{margin-top:20px;width:100%;max-width:800px;}
+</style>
+</head>
+
+<body>
+<div class="app">
+  <div class="header">
+    <h1 id="appTitle">7 College CGPA Calculator</h1>
+    <div>
+      <button onclick="toggleLang()" id="langBtn">English</button>
+      <button onclick="toggleTheme()">🌙</button>
+    </div>
+  </div>
+
+  <div class="grid">
+    <input id="prevCgpa" placeholder="Enter Previous CGPA">
+    <input id="prevCredits" placeholder="Enter Completed Credits">
+  </div>
+
+  <table id="subjectTable">
+    <tr>
+      <th id="thIndex">#</th>
+      <th id="thMarks">Marks (%)</th>
+      <th id="thGrade">OR Grade</th>
+      <th id="thCredit">Credit</th>
+      <th id="thPoint">Point</th>
+    </tr>
+  </table>
+
+  <div class="actions">
+    <button id="btnAdd" onclick="addSubject()">➕ Add Subject</button>
+    <button id="btnCalc" onclick="calculate()">🎓 Calculate</button>
+    <button id="btnPDF" onclick="downloadPDF()">📄 PDF</button>
+    <button id="btnSave" onclick="saveHistory()">💾 Save History</button>
+    <button id="btnChart" onclick="showChart()">📊 Show CGPA Chart</button>
+  </div>
+
+  <div class="result" id="result">Enter data to calculate CGPA</div>
+  <div class="dedication">Dedicated to Urmy Akter</div>
+
+  <div class="chart-container">
+    <canvas id="cgpaChart"></canvas>
+  </div>
+</div>
+
+<script>
+let currentLang="en";
+
+// Bangla digit converter
+function toBangla(num){
+  const bn=['০','১','২','৩','৪','৫','৬','৭','৮','৯'];
+  return String(num).split('').map(d=>bn[d]??d).join('');
+}
+
+// Grade map
+const gradeMap={"A+":4,"A":3.75,"A-":3.5,"B+":3.25,"B":3,"B-":2.75,"C+":2.5,"C":2.25,"D":2,"F":0};
+
+// Convert marks to grade & point
+function marksToGrade(m){
+  if(m>=80)return["A+",4]; if(m>=75)return["A",3.75]; if(m>=70)return["A-",3.5];
+  if(m>=65)return["B+",3.25]; if(m>=60)return["B",3]; if(m>=55)return["B-",2.75];
+  if(m>=50)return["C+",2.5]; if(m>=45)return["C",2.25]; if(m>=40)return["D",2];
+  return["F",0];
+}
+
+// Add a new subject row
+function addSubject(){
+  const table=document.getElementById("subjectTable");
+  const idx=table.rows.length;
+  const r=table.insertRow();
+  r.innerHTML=`
+    <td>${idx}</td>
+    <td><input type="number" placeholder="${currentLang==='en'?'Marks ':'মার্ক'}" oninput="fromMarks(this)"></td>
+    <td>
+      <select onchange="fromGrade(this)">
+        <option value="">${currentLang==='en'?'Select Grade':'গ্রেড নির্বাচন করুন'}</option>
+        ${Object.keys(gradeMap).map(g=>`<option>${g}</option>`).join("")}
+      </select>
+    </td>
+    <td><input type="number" step="0.5" placeholder="${currentLang==='en'?'Credit':'ক্রেডিট'}"></td>
+    <td>-</td>`;
+}
+
+function fromMarks(inp){
+  const row=inp.parentElement.parentElement;
+  row.cells[2].children[0].value="";
+  const g=marksToGrade(+inp.value);
+  row.cells[4].innerText=g[1];
+}
+
+function fromGrade(sel){
+  const row=sel.parentElement.parentElement;
+  row.cells[1].children[0].value="";
+  row.cells[4].innerText=gradeMap[sel.value]??"-";
+}
+
+// Load history
+let history=JSON.parse(localStorage.getItem("cgpaHistory")||"[]");
+
+// Calculate GPA/CGPA
+function calculate(){
+  let pc=+prevCredits.value||0;
+  let pg=+prevCgpa.value||0;
+  let tc=0,tp=0;
+  [...subjectTable.rows].slice(1).forEach(r=>{
+    const c=+r.cells[3].children[0].value;
+    const p=+r.cells[4].innerText;
+    if(c&&p>=0){tc+=c; tp+=c*p;}
+  });
+  const gpa=tp/tc||0;
+  const cgpa=((pg*pc)+(gpa*tc))/(pc+tc||1);
+  result.innerHTML=currentLang==='en'
+    ?`Current GPA: <b>${gpa.toFixed(2)}</b><br>Final CGPA: <b>${cgpa.toFixed(2)}</b>`
+    :`বর্তমান GPA: <b>${toBangla(gpa.toFixed(2))}</b><br>ফাইনাল CGPA: <b>${toBangla(cgpa.toFixed(2))}</b>`;
+  return {gpa,cgpa};
+}
+
+// Theme toggle
+function toggleTheme(){document.body.classList.toggle("dark")}
+
+// Language toggle
+function toggleLang(){
+  currentLang=currentLang==="en"?"bn":"en";
+  document.getElementById("langBtn").innerText=currentLang==="en"?"English":"বাংলা";
+  // Update all text
+  document.getElementById("appTitle").innerText=currentLang==='en'?'7 College CGPA Calculator':'৭ কলেজ CGPA ক্যালকুলেটর';
+  document.getElementById("prevCgpa").placeholder=currentLang==='en'?'Enter Previous CGPA':'পূর্ববর্তী CGPA লিখুন';
+  document.getElementById("prevCredits").placeholder=currentLang==='en'?'Enter Completed Credits':'সম্পন্ন ক্রেডিট লিখুন';
+  document.getElementById("thIndex").innerText=currentLang==='en'?'#':'ক্রমিক';
+  document.getElementById("thMarks").innerText=currentLang==='en'?'Marks':'মার্ক';
+  document.getElementById("thGrade").innerText=currentLang==='en'?'OR Grade':'গ্রেড';
+  document.getElementById("thCredit").innerText=currentLang==='en'?'Credit':'ক্রেডিট';
+  document.getElementById("thPoint").innerText=currentLang==='en'?'Point':'পয়েন্ট';
+  document.getElementById("btnAdd").innerText=currentLang==='en'?'➕ Add Subject':'➕ বিষয় যোগ করুন';
+  document.getElementById("btnCalc").innerText=currentLang==='en'?'🎓 Calculate':'🎓 হিসাব করুন';
+  document.getElementById("btnPDF").innerText=currentLang==='en'?'📄 PDF':'📄 পিডিএফ';
+  document.getElementById("btnSave").innerText=currentLang==='en'?'💾 Save History':'💾 ইতিহাস সংরক্ষণ';
+  document.getElementById("btnChart").innerText=currentLang==='en'?'📊 Show CGPA Chart':'📊 CGPA চার্ট দেখান';
+  // Update placeholders in existing rows
+  [...subjectTable.rows].slice(1).forEach(r=>{
+    r.cells[1].children[0].placeholder=currentLang==='en'?'Marks':'মার্ক ';
+    r.cells[3].children[0].placeholder=currentLang==='en'?'Credit':'ক্রেডিট';
+    r.cells[2].children[0].options[0].text=currentLang==='en'?'Select Grade':'গ্রেড নির্বাচন করুন';
+  });
+}
+
+// PDF download
+function downloadPDF(){
+  const {jsPDF}=window.jspdf;
+  const pdf=new jsPDF();
+  pdf.text(currentLang==='en'?'7 College CGPA Result':'৭ কলেজ CGPA ফলাফল',105,20,{align:"center"});
+  pdf.text(result.innerText,20,40);
+  pdf.save("CGPA_Result.pdf");
+}
+
+// Save history
+function saveHistory(){
+  const {gpa,cgpa}=calculate();
+  const h={gpa:toBangla(gpa.toFixed(2)), cgpa:toBangla(cgpa.toFixed(2))};
+  history.push(h);
+  localStorage.setItem("cgpaHistory", JSON.stringify(history));
+  alert(currentLang==='en'?'History saved!':'ইতিহাস সংরক্ষিত হয়েছে!');
+}
+
+// Show chart
+let chartInstance;
+function showChart(){
+  if(chartInstance) chartInstance.destroy();
+  const ctx=document.getElementById("cgpaChart").getContext("2d");
+  chartInstance=new Chart(ctx,{
+    type:'line',
+    data:{
+      labels:history.map((_,i)=>toBangla(i+1)),
+      datasets:[
+        {label:'GPA',data:history.map(h=>parseFloat(h.gpa.replace(/[^\d.]/g,''))),
+         borderColor:'rgba(233,30,99,1)', backgroundColor:'rgba(233,30,99,0.2)', tension:0.3},
+        {label:'CGPA',data:history.map(h=>parseFloat(h.cgpa.replace(/[^\d.]/g,''))),
+         borderColor:'rgba(255,193,7,1)', backgroundColor:'rgba(255,193,7,0.2)', tension:0.3}
+      ]
+    },
+    options:{responsive:true, plugins:{legend:{position:'top'}}, scales:{y:{beginAtZero:true}}}
+  });
+}
+
+// Initial subjects
+addSubject();addSubject();addSubject();
+</script>
+</body>
+</html>
